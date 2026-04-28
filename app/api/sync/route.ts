@@ -1,68 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-interface StatItem { name: string; score: number; max: number; }
-interface CharacterData { attributes: StatItem[]; skills: StatItem[]; updatedAt?: string; }
+import bcrypt from 'bcryptjs';
+import { getUser, setUser } from '@/lib/redis';
+import type { StatItem } from '@/lib/redis';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-sync-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
-
-// Fallback in-memory per sviluppo locale senza Redis
-let memStore: CharacterData | null = null;
-
-function hasRedis() {
-  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-}
-
-async function redisGet(): Promise<CharacterData | null> {
-  const { Redis } = await import('@upstash/redis');
-  const redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-  });
-  return redis.get<CharacterData>('character');
-}
-
-async function redisSet(data: CharacterData): Promise<void> {
-  const { Redis } = await import('@upstash/redis');
-  const redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-  });
-  await redis.set('character', data);
-}
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
-export async function GET() {
-  const data = hasRedis()
-    ? (await redisGet() ?? { attributes: [], skills: [] })
-    : (memStore ?? { attributes: [], skills: [] });
-  return NextResponse.json(data, { headers: CORS });
-}
-
 export async function POST(req: NextRequest) {
-  const secret = process.env.SYNC_SECRET;
-  if (secret && req.headers.get('x-sync-secret') !== secret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
+  let body: { username?: string; password?: string; attributes?: StatItem[]; skills?: StatItem[] };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'JSON non valido' }, { status: 400, headers: CORS });
   }
 
-  const body = await req.json() as CharacterData;
-  const data: CharacterData = {
-    attributes: body.attributes ?? [],
-    skills: body.skills ?? [],
+  const { username, password, attributes, skills } = body;
+
+  if (!username || !password) {
+    return NextResponse.json({ error: 'Username e password obbligatori' }, { status: 400, headers: CORS });
+  }
+
+  const existing = await getUser(username);
+
+  if (existing) {
+    // Utente esiste → verifica password
+    const valid = await bcrypt.compare(password, existing.passwordHash);
+    if (!valid) {
+      return NextResponse.json({ error: 'Password errata per questo username' }, { status: 401, headers: CORS });
+    }
+  }
+
+  const passwordHash = existing
+    ? existing.passwordHash
+    : await bcrypt.hash(password, 10);
+
+  await setUser(username, {
+    passwordHash,
+    attributes: attributes ?? [],
+    skills: skills ?? [],
     updatedAt: new Date().toISOString(),
-  };
+  });
 
-  if (hasRedis()) {
-    await redisSet(data);
-  } else {
-    memStore = data;
-  }
-
-  return NextResponse.json({ ok: true }, { headers: CORS });
+  const action = existing ? 'aggiornata' : 'creata';
+  return NextResponse.json({ ok: true, message: `Scheda ${action} per ${username}` }, { headers: CORS });
 }
