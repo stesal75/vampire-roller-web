@@ -14,9 +14,12 @@ export interface CharacterData {
 }
 
 function getRedis(): Redis {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    throw new Error('Redis non configurato su Vercel. Vai su Vercel Dashboard → Storage → Create → Upstash Redis → Connect to Project.');
+  }
   return new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
   });
 }
 
