@@ -14,8 +14,8 @@ export interface CharacterData {
 }
 
 function getRedis(): Redis {
-  const url = process.env.vampire_KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.vampire_KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.vampire_KV_REST_API_URL || process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.vampire_KV_REST_API_TOKEN || process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {
     throw new Error('Redis non configurato su Vercel. Vai su Vercel Dashboard → Storage → Create → Upstash Redis → Connect to Project.');
   }
@@ -28,4 +28,17 @@ export async function getUser(username: string): Promise<UserRecord | null> {
 
 export async function setUser(username: string, data: UserRecord): Promise<void> {
   await getRedis().set(`user:${username}`, data);
+}
+
+export async function createResetToken(username: string): Promise<string> {
+  const token = crypto.randomUUID();
+  await getRedis().set(`reset:${token}`, username, { ex: 60 * 30 }); // 30 minuti
+  return token;
+}
+
+export async function consumeResetToken(token: string): Promise<string | null> {
+  const redis = getRedis();
+  const username = await redis.get<string>(`reset:${token}`);
+  if (username) await redis.del(`reset:${token}`);
+  return username;
 }
