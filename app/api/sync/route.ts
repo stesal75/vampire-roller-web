@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { getUser, setUser } from '@/lib/redis';
-import type { StatItem } from '@/lib/redis';
+import type { StatItem, DisciplineItem, RitualGroup } from '@/lib/redis';
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204 });
@@ -9,14 +9,21 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    let body: { username?: string; password?: string; attributes?: StatItem[]; skills?: StatItem[] };
+    let body: {
+      username?: string;
+      password?: string;
+      attributes?: StatItem[];
+      skills?: StatItem[];
+      disciplines?: DisciplineItem[];
+      rituals?: RitualGroup[];
+    };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: 'JSON non valido' }, { status: 400 });
     }
 
-    const { username, password, attributes, skills } = body;
+    const { username, password, attributes, skills, disciplines, rituals } = body;
 
     if (!username || !password) {
       return NextResponse.json({ error: 'Username e password obbligatori' }, { status: 400 });
@@ -39,6 +46,8 @@ export async function POST(req: NextRequest) {
       passwordHash,
       attributes: attributes ?? [],
       skills: skills ?? [],
+      disciplines: disciplines ?? [],
+      rituals: rituals ?? [],
       updatedAt: new Date().toISOString(),
     });
 

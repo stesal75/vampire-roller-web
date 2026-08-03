@@ -1,15 +1,33 @@
 import { Redis } from '@upstash/redis';
 
 export interface StatItem { name: string; score: number; max: number; }
+
+export interface PoolInfo { label: string; value: number | null; formula: string; }
+export interface PowerItem {
+  level: string;
+  source: string;
+  name: string;
+  activation: string;
+  description: string;
+  pool: PoolInfo;
+  vs: PoolInfo;
+}
+export interface DisciplineItem { name: string; score: number; max: number; powers: PowerItem[]; }
+export interface RitualGroup { category: string; powers: PowerItem[]; }
+
 export interface UserRecord {
   passwordHash: string;
   attributes: StatItem[];
   skills: StatItem[];
+  disciplines: DisciplineItem[];
+  rituals: RitualGroup[];
   updatedAt: string;
 }
 export interface CharacterData {
   attributes: StatItem[];
   skills: StatItem[];
+  disciplines: DisciplineItem[];
+  rituals: RitualGroup[];
   updatedAt?: string;
 }
 

@@ -23,6 +23,8 @@ export default async function Page() {
   const charData = {
     attributes: userData?.attributes ?? [],
     skills: userData?.skills ?? [],
+    disciplines: userData?.disciplines ?? [],
+    rituals: userData?.rituals ?? [],
     updatedAt: userData?.updatedAt,
   };
 
